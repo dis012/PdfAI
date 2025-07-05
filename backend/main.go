@@ -21,6 +21,8 @@ func main() {
 	}
 
 	dbUrl := os.Getenv("DB_URL")
+	ollamaEndpoint := os.Getenv("OLLAMA_ENDPOINT")
+
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
 		log.Fatal(err)
@@ -31,13 +33,15 @@ func main() {
 	apiConfig := &apiConfig{
 		db:          dbQueries,
 		maxFileSize: 50,
-		uploadDir:   "./",
-		ollamaURL:   "http://localhost:11434/api/generate",
+		ollamaURL:   ollamaEndpoint,
 	}
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /api/upload", apiConfig.uploadAndPromptHandler)
+
+	mux.HandleFunc("GET /api/sessions", apiConfig.getSessions)
+	mux.HandleFunc("GET /api/tables/{session_id}", apiConfig.getTableSession)
 
 	server := &http.Server{
 		Addr:    port,

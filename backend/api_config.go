@@ -1,20 +1,20 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github/dis012/PDFAI/internal/database"
 	"io"
 	"net/http"
-	"os"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type apiConfig struct {
 	db          *database.Queries
 	maxFileSize int64
-	uploadDir   string
 	ollamaURL   string
 }
 
@@ -32,7 +32,7 @@ func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Re
 	// Limit file size to 50MB
 	req.Body = http.MaxBytesReader(w, req.Body, 50<<20)
 
-	file, handler, err := req.FormFile("pdf")
+	file, handler, err := req.FormFile("pdf") // Handle in front end!!!
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
@@ -41,12 +41,6 @@ func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Re
 
 	if !strings.HasSuffix(strings.ToLower(handler.Filename), ".pdf") {
 		respondWithError(w, http.StatusBadRequest, "Only PDF files are allowed")
-		return
-	}
-
-	// Create uploads directory if it doesn't exist
-	if err := os.MkdirAll(cfg.uploadDir, 0755); err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Unable to create uploads directory")
 		return
 	}
 
@@ -75,6 +69,12 @@ func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Re
 		return
 	}
 
+	session, err := cfg.db.CreateNewSession(req.Context(), email.ID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	model_config := OllamaRequest{
 		Model:  "gemma3n:e4b",
 		Prompt: fmt.Sprintf("%v %v", prompt, email.EmailText),
@@ -90,7 +90,7 @@ func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Re
 	}
 
 	req_body := strings.NewReader(string(ollama_request))
-	r, err := http.NewRequest("POST", cfg.ollamaURL, req_body)
+	r, err := http.NewRequest(http.MethodPost, cfg.ollamaURL, req_body)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
@@ -115,19 +115,61 @@ func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	saved_response, err := cfg.db.AddResponse(req.Context(), database.AddResponseParams{
-		Model:    sql.NullString{String: model_response.Model, Valid: model_response.Model != ""},
-		Response: model_response.Response,
-		EmailID:  email.ID,
+	jsonLlmResponse, mapLlmResponse, err := cleanJsonString(model_response.Response)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	_, err = cfg.db.CreateTableVersion(req.Context(), database.CreateTableVersionParams{
+		SessionID:    uuid.NullUUID{UUID: session.ID, Valid: true},
+		ResponseJson: jsonLlmResponse,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Failed to unmarshal response body")
 		return
 	}
 
-	respondWithJson(w, http.StatusOK, ModelResponse{
-		Model:     saved_response.Model.String,
-		CreatedAt: saved_response.CreatedAt.String(),
-		Response:  saved_response.Response,
-	})
+	respondWithJson(w, http.StatusOK, mapLlmResponse)
+}
+
+func (cfg *apiConfig) getSessions(w http.ResponseWriter, req *http.Request) {
+	type response_param struct {
+		Title     string    `json:"title"`
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+	}
+
+	sessions_response := []response_param{}
+	sessions, err := cfg.db.GetAllSessions(req.Context())
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	for i, session := range sessions {
+		sessions_response = append(sessions_response, response_param{
+			Title:     fmt.Sprintf("Email number %v", i+1),
+			ID:        session.ID,
+			CreatedAt: session.CreatedAt,
+		})
+	}
+
+	respondWithJson(w, http.StatusOK, sessions_response)
+}
+
+func (cfg *apiConfig) getTableSession(w http.ResponseWriter, req *http.Request) {
+	sessionId, err := uuid.Parse(req.PathValue("session_id"))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found")
+		return
+	}
+
+	table, err := cfg.db.GetTableBasedOnSession(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, table.ResponseJson)
 }

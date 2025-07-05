@@ -6,6 +6,7 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,10 +18,17 @@ type Email struct {
 	EmailText string
 }
 
-type ModelResponse struct {
+type Session struct {
 	ID        uuid.UUID
-	Model     sql.NullString
-	CreatedAt time.Time
-	Response  string
 	EmailID   uuid.UUID
+	CreatedAt time.Time
+}
+
+type TableVersion struct {
+	ID            uuid.UUID
+	SessionID     uuid.NullUUID
+	CreatedAt     time.Time
+	ResponseJson  json.RawMessage
+	VersionNumber int32
+	IsActive      sql.NullBool
 }
