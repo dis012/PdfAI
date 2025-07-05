@@ -30,16 +30,20 @@ func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Re
 	}
 
 	// Limit file size to 50MB
-	req.Body = http.MaxBytesReader(w, req.Body, 50<<20)
+	err = req.ParseMultipartForm(10 << 20)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-	file, handler, err := req.FormFile("pdf") // Handle in front end!!!
+	file, header, err := req.FormFile("pdf") // Handle in front end!!!
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer file.Close()
 
-	if !strings.HasSuffix(strings.ToLower(handler.Filename), ".pdf") {
+	if !strings.HasSuffix(strings.ToLower(header.Filename), ".pdf") {
 		respondWithError(w, http.StatusBadRequest, "Only PDF files are allowed")
 		return
 	}
