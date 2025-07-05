@@ -1,4 +1,23 @@
 docker run -d --gpus=all -e OLLAMA_HOST=0.0.0.0:11434 -e OLLAMA_MODELS=/root/.ollama/models -v C:/WolfsAI/ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
 
-# Run this command to pull a model
-docker exec ollama ollama pull gemma3:4b
+docker pull ollama/ollama
+
+# FOR CPU
+docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+
+#FOR GPU
+docker run -d --gpus all -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+
+# Pull the model
+docker exec -it ollama ollama pull gemma3n:4b
+
+# Example request
+curl http://localhost:11434/api/generate -d '{
+  "model": "gemma3n:4b",
+  "prompt": "",
+  "stream": false
+}'
+
+
+curl -v -X POST -F "pdf=@/home/adis/Projects/PdfAI/backend/TestCases/tesEmail.pdf" http://localhost:8080/api/upload
+curl -v -X GET http://localhost:8080/api/sessions
