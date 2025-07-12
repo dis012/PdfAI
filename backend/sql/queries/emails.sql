@@ -6,3 +6,7 @@ VALUES(
     $1
 )
 RETURNING *;
+
+-- name: GetEmailById :one
+SELECT email_text FROM emails
+WHERE id = $1;

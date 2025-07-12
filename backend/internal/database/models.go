@@ -12,6 +12,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type Chat struct {
+	ID        uuid.UUID
+	SessionID uuid.NullUUID
+	Prompt    sql.NullString
+	Response  sql.NullString
+	CreatedAt time.Time
+}
+
 type Email struct {
 	ID        uuid.UUID
 	CreatedAt time.Time

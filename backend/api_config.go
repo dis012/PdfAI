@@ -22,6 +22,10 @@ const prompt = `Extract all relevant data and key details from the following tex
 valid JSON format. Ensure the JSON includes clearly named fields that reflect the meaning and context of the information (e.g., names, dates, locations, events, values, quantities, descriptions, etc.).
 Only return the JSON—do not include any explanations, commentary, or additional text. Text to extract from:`
 
+const updateTablePrompt = `You are an AI assistant that modifies a JSON object based on a user's request. Your task is to apply the user's change and return the entire, updated, and valid JSON object.
+Maintain the original structure of the JSON. Only modify the data as requested by the user's instruction.
+Do not add any commentary, explanations, or markdown fences like json. No matter what happens DO NOT respond with anything else then JSON. Only output the final JSON. I will provide you with the email, current json table and users new request:`
+
 func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Request) {
 	err := req.ParseMultipartForm(cfg.maxFileSize)
 	if err != nil {
@@ -176,4 +180,196 @@ func (cfg *apiConfig) getTableSession(w http.ResponseWriter, req *http.Request) 
 	}
 
 	respondWithJson(w, http.StatusOK, table.ResponseJson)
+}
+
+func (cfg *apiConfig) updateTable(w http.ResponseWriter, req *http.Request) {
+	type request_params struct {
+		Prompt string `json:"prompt"`
+	}
+
+	params := request_params{}
+	decoder := json.NewDecoder(req.Body)
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	sessionId, err := uuid.Parse(req.PathValue("session_id"))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found")
+		return
+	}
+
+	session, err := cfg.db.GetSessionById(req.Context(), sessionId)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	email, err := cfg.db.GetEmailById(req.Context(), session.EmailID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	table, err := cfg.db.GetTableBasedOnSession(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	model_config := OllamaRequest{
+		Model:  "gemma3n:e4b",
+		Prompt: fmt.Sprintf("%v\n %v\n %v\n %v", updateTablePrompt, email, string(table.ResponseJson), params.Prompt),
+		Stream: false,
+	}
+
+	model_response := OllamaResponse{}
+
+	ollama_request, err := json.Marshal(model_config)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	req_body := strings.NewReader(string(ollama_request))
+	r, err := http.NewRequest(http.MethodPost, cfg.ollamaURL, req_body)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	res, err := http.DefaultClient.Do(r)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer res.Body.Close()
+
+	body_bytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to read response body")
+		return
+	}
+
+	err = json.Unmarshal(body_bytes, &model_response)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to unmarshal response body")
+		return
+	}
+
+	jsonLlmResponse, mapLlmResponse, err := cleanJsonString(model_response.Response)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	err = cfg.db.DisableCurrentTable(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	_, err = cfg.db.UpdateTableVersion(req.Context(), database.UpdateTableVersionParams{
+		SessionID:    uuid.NullUUID{UUID: sessionId, Valid: true},
+		ResponseJson: jsonLlmResponse,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, mapLlmResponse)
+}
+
+func (cfg *apiConfig) undoTableVersion(w http.ResponseWriter, req *http.Request) {
+	sessionId, err := uuid.Parse(req.PathValue("session_id"))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found")
+		return
+	}
+
+	table, err := cfg.db.GetTableBasedOnSession(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if table.VersionNumber == 1 {
+		respondWithError(w, http.StatusBadRequest, "No older version available")
+		return
+	}
+
+	err = cfg.db.DisableCurrentTable(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response, err := cfg.db.ChangeVersion(req.Context(), database.ChangeVersionParams{
+		SessionID:     table.SessionID,
+		VersionNumber: table.VersionNumber - 1,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var responseMap map[string]interface{}
+	err = json.Unmarshal([]byte(response), &responseMap)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, responseMap)
+}
+
+func (cfg *apiConfig) redoTableVersion(w http.ResponseWriter, req *http.Request) {
+	sessionId, err := uuid.Parse(req.PathValue("session_id"))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found")
+		return
+	}
+
+	table, err := cfg.db.GetTableBasedOnSession(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	currentNewestVersion, err := cfg.db.GetLatestVersionNumber(req.Context(), table.SessionID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if table.VersionNumber == currentNewestVersion {
+		respondWithError(w, http.StatusBadRequest, "You have reached the max table version")
+		return
+	}
+
+	err = cfg.db.DisableCurrentTable(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response, err := cfg.db.ChangeVersion(req.Context(), database.ChangeVersionParams{
+		SessionID:     table.SessionID,
+		VersionNumber: table.VersionNumber + 1,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var responseMap map[string]interface{}
+	err = json.Unmarshal([]byte(response), &responseMap)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, responseMap)
 }

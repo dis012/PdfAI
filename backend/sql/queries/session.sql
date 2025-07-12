@@ -10,3 +10,7 @@ RETURNING *;
 -- name: GetAllSessions :many
 SELECT * FROM session
 ORDER BY created_at ASC;
+
+-- name: GetSessionById :one
+SELECT * FROM session
+WHERE id = $1;

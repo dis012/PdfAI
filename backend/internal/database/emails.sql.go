@@ -7,6 +7,8 @@ package database
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 const createEmail = `-- name: CreateEmail :one
@@ -24,4 +26,16 @@ func (q *Queries) CreateEmail(ctx context.Context, emailText string) (Email, err
 	var i Email
 	err := row.Scan(&i.ID, &i.CreatedAt, &i.EmailText)
 	return i, err
+}
+
+const getEmailById = `-- name: GetEmailById :one
+SELECT email_text FROM emails
+WHERE id = $1
+`
+
+func (q *Queries) GetEmailById(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRowContext(ctx, getEmailById, id)
+	var email_text string
+	err := row.Scan(&email_text)
+	return email_text, err
 }
