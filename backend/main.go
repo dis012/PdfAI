@@ -43,6 +43,10 @@ func main() {
 	mux.HandleFunc("GET /api/sessions", apiConfig.getSessions)
 	mux.HandleFunc("GET /api/tables/{session_id}", apiConfig.getTableSession)
 
+	mux.HandleFunc("PUT /api/tables/{session_id}", apiConfig.updateTable)
+	mux.HandleFunc("PUT /api/tables/undo/{session_id}", apiConfig.undoTableVersion)
+	mux.HandleFunc("PUT /api/tables/redo/{session_id}", apiConfig.redoTableVersion)
+
 	server := &http.Server{
 		Addr:    port,
 		Handler: mux,

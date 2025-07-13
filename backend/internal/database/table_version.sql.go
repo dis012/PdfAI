@@ -12,6 +12,25 @@ import (
 	"github.com/google/uuid"
 )
 
+const changeVersion = `-- name: ChangeVersion :one
+UPDATE table_version
+SET is_active = TRUE
+WHERE session_id = $1 AND version_number = $2
+RETURNING response_json
+`
+
+type ChangeVersionParams struct {
+	SessionID     uuid.NullUUID
+	VersionNumber int32
+}
+
+func (q *Queries) ChangeVersion(ctx context.Context, arg ChangeVersionParams) (json.RawMessage, error) {
+	row := q.db.QueryRowContext(ctx, changeVersion, arg.SessionID, arg.VersionNumber)
+	var response_json json.RawMessage
+	err := row.Scan(&response_json)
+	return response_json, err
+}
+
 const createTableVersion = `-- name: CreateTableVersion :one
 INSERT INTO table_version(id, session_id, created_at, response_json, version_number, is_active)
 VALUES(
@@ -44,6 +63,30 @@ func (q *Queries) CreateTableVersion(ctx context.Context, arg CreateTableVersion
 	return i, err
 }
 
+const disableCurrentTable = `-- name: DisableCurrentTable :exec
+UPDATE table_version
+SET is_active = FALSE
+WHERE session_id = $1 AND is_active = TRUE
+`
+
+func (q *Queries) DisableCurrentTable(ctx context.Context, sessionID uuid.NullUUID) error {
+	_, err := q.db.ExecContext(ctx, disableCurrentTable, sessionID)
+	return err
+}
+
+const getLatestVersionNumber = `-- name: GetLatestVersionNumber :one
+SELECT COALESCE(MAX(version_number), 0)
+FROM table_version
+WHERE session_id = $1
+`
+
+func (q *Queries) GetLatestVersionNumber(ctx context.Context, sessionID uuid.NullUUID) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getLatestVersionNumber, sessionID)
+	var coalesce interface{}
+	err := row.Scan(&coalesce)
+	return coalesce, err
+}
+
 const getTableBasedOnSession = `-- name: GetTableBasedOnSession :one
 SELECT id, session_id, created_at, response_json, version_number, is_active FROM table_version
 WHERE session_id = $1 AND is_active = TRUE
@@ -51,6 +94,38 @@ WHERE session_id = $1 AND is_active = TRUE
 
 func (q *Queries) GetTableBasedOnSession(ctx context.Context, sessionID uuid.NullUUID) (TableVersion, error) {
 	row := q.db.QueryRowContext(ctx, getTableBasedOnSession, sessionID)
+	var i TableVersion
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.CreatedAt,
+		&i.ResponseJson,
+		&i.VersionNumber,
+		&i.IsActive,
+	)
+	return i, err
+}
+
+const updateTableVersion = `-- name: UpdateTableVersion :one
+INSERT INTO table_version (id, session_id, created_at, response_json, version_number, is_active)
+VALUES (
+    gen_random_uuid(),
+    $1,
+    NOW(),
+    $2,
+    (SELECT COALESCE(MAX(version_number), 0) + 1 FROM table_version WHERE session_id = $1),
+    TRUE
+)
+RETURNING id, session_id, created_at, response_json, version_number, is_active
+`
+
+type UpdateTableVersionParams struct {
+	SessionID    uuid.NullUUID
+	ResponseJson json.RawMessage
+}
+
+func (q *Queries) UpdateTableVersion(ctx context.Context, arg UpdateTableVersionParams) (TableVersion, error) {
+	row := q.db.QueryRowContext(ctx, updateTableVersion, arg.SessionID, arg.ResponseJson)
 	var i TableVersion
 	err := row.Scan(
 		&i.ID,

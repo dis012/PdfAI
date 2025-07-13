@@ -20,4 +20,12 @@ curl http://localhost:11434/api/generate -d '{
 
 
 curl -v -X POST -F "pdf=@/home/adis/Projects/PdfAI/backend/TestCases/tesEmail.pdf" http://localhost:8080/api/upload
-curl -v -X GET http://localhost:8080/api/sessions
+
+curl -v -X GET http://localhost:8080/api/tables/843c0509-cd7c-40fb-9e39-9843b413eeb7
+
+curl -X PUT http://localhost:8080/api/tables/843c0509-cd7c-40fb-9e39-9843b413eeb7 -H "Content-Type: application/json" -d '{"prompt": "Can you remove the thesis_mentor and add more info about the survey"}'
+
+curl -X PUT http://localhost:8080/api/tables/undo/843c0509-cd7c-40fb-9e39-9843b413eeb7
+curl -X PUT http://localhost:8080/api/tables/redo/843c0509-cd7c-40fb-9e39-9843b413eeb7
+
+curl -X GET http://localhost:8080/api/sessions

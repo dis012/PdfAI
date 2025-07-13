@@ -55,3 +55,15 @@ func (q *Queries) GetAllSessions(ctx context.Context) ([]Session, error) {
 	}
 	return items, nil
 }
+
+const getSessionById = `-- name: GetSessionById :one
+SELECT id, email_id, created_at FROM session
+WHERE id = $1
+`
+
+func (q *Queries) GetSessionById(ctx context.Context, id uuid.UUID) (Session, error) {
+	row := q.db.QueryRowContext(ctx, getSessionById, id)
+	var i Session
+	err := row.Scan(&i.ID, &i.EmailID, &i.CreatedAt)
+	return i, err
+}
