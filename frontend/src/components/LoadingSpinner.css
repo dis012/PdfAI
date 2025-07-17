@@ -1,0 +1,150 @@
+/* Loading Spinner Component Styles */
+
+.loading-spinner-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.loading-spinner-container.inline {
+  flex-direction: row;
+  gap: 0.5rem;
+}
+
+.loading-spinner-container.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.9);
+  z-index: 1000;
+  backdrop-filter: blur(1px);
+}
+
+.loading-spinner {
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  border-style: solid;
+  border-color: #e9ecef;
+  border-top-color: #007bff;
+}
+
+/* Size variants */
+.loading-spinner.spinner-small {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.loading-spinner.spinner-medium {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+}
+
+.loading-spinner.spinner-large {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+.loading-spinner.spinner-extra-large {
+  width: 48px;
+  height: 48px;
+  border-width: 4px;
+}
+
+.loading-text {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.loading-spinner-container.inline .loading-text {
+  font-size: 0.75rem;
+}
+
+/* Screen reader only text */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Animation */
+@keyframes spin {
+  0% { 
+    transform: rotate(0deg); 
+  }
+  100% { 
+    transform: rotate(360deg); 
+  }
+}
+
+/* Color variants */
+.loading-spinner.success {
+  border-top-color: #28a745;
+}
+
+.loading-spinner.warning {
+  border-top-color: #ffc107;
+}
+
+.loading-spinner.danger {
+  border-top-color: #dc3545;
+}
+
+.loading-spinner.info {
+  border-top-color: #17a2b8;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .loading-spinner {
+    border-color: #000;
+    border-top-color: #000;
+  }
+  
+  .loading-spinner-container.overlay {
+    background-color: rgba(255, 255, 255, 0.95);
+  }
+  
+  .loading-text {
+    color: #000;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation: none;
+    border-top-color: #007bff;
+    border-right-color: #007bff;
+  }
+}
+
+/* Dark mode support (if needed in future) */
+@media (prefers-color-scheme: dark) {
+  .loading-spinner {
+    border-color: #495057;
+    border-top-color: #007bff;
+  }
+  
+  .loading-spinner-container.overlay {
+    background-color: rgba(33, 37, 41, 0.9);
+  }
+  
+  .loading-text {
+    color: #adb5bd;
+  }
+}

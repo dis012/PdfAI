@@ -1,0 +1,149 @@
+/* Table Skeleton Loading Styles */
+
+.table-skeleton-container {
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.table-skeleton-container .table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.skeleton-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.skeleton-row {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-header-row {
+  background-color: #f8f9fa;
+}
+
+.skeleton-cell {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #dee2e6;
+  vertical-align: top;
+}
+
+.skeleton-header-cell {
+  border-bottom: 2px solid #dee2e6;
+  background-color: #f8f9fa;
+}
+
+.skeleton-content {
+  height: 1rem;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+.skeleton-header-content {
+  height: 1.2rem;
+  background: linear-gradient(90deg, #e9ecef 25%, #dee2e6 50%, #e9ecef 75%);
+  background-size: 200% 100%;
+}
+
+.skeleton-loading-text {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.skeleton-text-line {
+  height: 0.875rem;
+  width: 200px;
+  margin: 0 auto;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+/* Animations */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .skeleton-cell {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .skeleton-content {
+    height: 0.875rem;
+  }
+  
+  .skeleton-header-content {
+    height: 1rem;
+  }
+  
+  .skeleton-text-line {
+    width: 150px;
+    height: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .skeleton-cell {
+    padding: 0.4rem 0.5rem;
+  }
+  
+  .skeleton-content {
+    height: 0.75rem;
+  }
+  
+  .skeleton-header-content {
+    height: 0.875rem;
+  }
+  
+  .skeleton-text-line {
+    width: 120px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .skeleton-content,
+  .skeleton-header-content,
+  .skeleton-text-line {
+    background: linear-gradient(90deg, #d0d0d0 25%, #a0a0a0 50%, #d0d0d0 75%);
+    background-size: 200% 100%;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-content,
+  .skeleton-header-content,
+  .skeleton-text-line {
+    animation: none;
+    background: #e9ecef;
+  }
+  
+  .skeleton-row {
+    animation: none;
+  }
+}
