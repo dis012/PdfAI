@@ -6,14 +6,23 @@ export interface Session {
   created_at: string;   // ISO timestamp
 }
 
+export interface TableRow {
+  field: string;        // Display name (e.g., "Student Name")
+  value: any;          // The actual value
+}
+
 export interface TableData {
-  [key: string]: any;   // Dynamic JSON structure from backend
+  table_rows: TableRow[];     // Formatted table rows
+  version_number: number;     // Current version
+  can_undo: boolean;         // Whether undo is available
+  can_redo: boolean;         // Whether redo is available
 }
 
 export interface TableState {
-  data: TableData;
+  rows: TableRow[];
   canUndo: boolean;
   canRedo: boolean;
+  versionNumber: number;
 }
 
 // API Request Types
@@ -23,15 +32,18 @@ export interface EditRequest {
 
 // API Response Types
 export interface UploadResponse {
-  [key: string]: any;   // Dynamic JSON structure
+  session_id: string;
+  title: string;
+  table_rows: TableRow[];
 }
 
-export interface SessionsResponse {
-  sessions: Session[];
-}
+export interface SessionsResponse extends Array<Session> {}
 
 export interface TableResponse {
-  data: TableData;
+  table_rows: TableRow[];
+  version_number: number;
+  can_undo: boolean;
+  can_redo: boolean;
 }
 
 export interface ErrorResponse {
