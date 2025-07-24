@@ -213,18 +213,36 @@ export function isSessionArray(obj: any): obj is import('../types').Session[] {
     return Array.isArray(obj) && obj.every(isSession);
 }
 
+export function isTableRow(obj: any): obj is import('../types').TableRow {
+    return (
+        typeof obj === 'object' &&
+        obj !== null &&
+        typeof obj.field === 'string' &&
+        obj.value !== undefined
+    );
+}
+
 export function isTableData(obj: any): obj is import('../types').TableData {
-    return typeof obj === 'object' && obj !== null;
+    return (
+        typeof obj === 'object' &&
+        obj !== null &&
+        Array.isArray(obj.table_rows) &&
+        obj.table_rows.every(isTableRow) &&
+        typeof obj.version_number === 'number' &&
+        typeof obj.can_undo === 'boolean' &&
+        typeof obj.can_redo === 'boolean'
+    );
 }
 
 export function isTableState(obj: any): obj is import('../types').TableState {
     return (
         typeof obj === 'object' &&
         obj !== null &&
-        'data' in obj &&
-        isTableData(obj.data) &&
+        Array.isArray(obj.rows) &&
+        obj.rows.every(isTableRow) &&
         typeof obj.canUndo === 'boolean' &&
-        typeof obj.canRedo === 'boolean'
+        typeof obj.canRedo === 'boolean' &&
+        typeof obj.versionNumber === 'number'
     );
 }
 
@@ -254,12 +272,7 @@ export function validateApiResponse<T>(
  * Validate session response
  */
 export function validateSessionsResponse(data: unknown): import('../types').Session[] {
-    if (typeof data === 'object' && data !== null && 'sessions' in data) {
-        const sessions = (data as any).sessions;
-        return validateApiResponse(sessions, isSessionArray, 'sessions');
-    }
-
-    // If data is directly an array of sessions
+    // Backend now returns array directly
     return validateApiResponse(data, isSessionArray, 'sessions');
 }
 
@@ -267,45 +280,21 @@ export function validateSessionsResponse(data: unknown): import('../types').Sess
  * Validate table data response
  */
 export function validateTableResponse(data: unknown): import('../types').TableData {
-    if (typeof data === 'object' && data !== null && 'data' in data) {
-        const tableData = (data as any).data;
-        return validateApiResponse(tableData, isTableData, 'table data');
-    }
-
-    // If data is directly table data
     return validateApiResponse(data, isTableData, 'table data');
 }
 
 /**
- * Validate table state response (includes undo/redo state)
+ * Validate table state response and convert to frontend format
  */
 export function validateTableStateResponse(data: unknown): import('../types').TableState {
-    // Check if response has the full TableState structure
-    if (isTableState(data)) {
-        return data;
-    }
-
-    // If response only has table data, create TableState with default undo/redo state
-    if (typeof data === 'object' && data !== null && 'data' in data) {
-        const tableData = (data as any).data;
-        const canUndo = typeof (data as any).canUndo === 'boolean' ? (data as any).canUndo : false;
-        const canRedo = typeof (data as any).canRedo === 'boolean' ? (data as any).canRedo : false;
-        
-        return {
-            data: validateApiResponse(tableData, isTableData, 'table data'),
-            canUndo,
-            canRedo
-        };
-    }
-
-    // If data is directly table data, wrap it in TableState
-    if (isTableData(data)) {
-        return {
-            data: data,
-            canUndo: false,
-            canRedo: false
-        };
-    }
-
-    throw new Error('Invalid table state response structure');
+    // Validate the backend response structure
+    const validatedData = validateApiResponse(data, isTableData, 'table data');
+    
+    // Convert backend format to frontend format
+    return {
+        rows: validatedData.table_rows,
+        canUndo: validatedData.can_undo,
+        canRedo: validatedData.can_redo,
+        versionNumber: validatedData.version_number
+    };
 }

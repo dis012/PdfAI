@@ -118,7 +118,7 @@ export async function uploadFile(uploadFile: UploadFile): Promise<ApiResult<Uplo
   const retryResult = await retryApiCall(
     async () => {
       const formData = new FormData();
-      formData.append('file', uploadFile.file);
+      formData.append('pdf', uploadFile.file); // Changed from 'file' to 'pdf'
 
       const response = await fetchWithTimeout(`${API_BASE_URL}/upload`, {
         method: 'POST',

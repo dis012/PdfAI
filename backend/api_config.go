@@ -134,11 +134,24 @@ func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Re
 		ResponseJson: jsonLlmResponse,
 	})
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Failed to unmarshal response body")
+		respondWithError(w, http.StatusBadRequest, "Failed to create table version")
 		return
 	}
 
-	respondWithJson(w, http.StatusOK, mapLlmResponse)
+	// Return session info and formatted table data
+	type uploadResponse struct {
+		SessionID uuid.UUID                `json:"session_id"`
+		Title     string                   `json:"title"`
+		TableRows []map[string]interface{} `json:"table_rows"`
+	}
+
+	response := uploadResponse{
+		SessionID: session.ID,
+		Title:     "New email",
+		TableRows: formatTableData(mapLlmResponse),
+	}
+
+	respondWithJson(w, http.StatusOK, response)
 }
 
 func (cfg *apiConfig) getSessions(w http.ResponseWriter, req *http.Request) {
@@ -179,7 +192,51 @@ func (cfg *apiConfig) getTableSession(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	respondWithJson(w, http.StatusOK, table.ResponseJson)
+	// Get latest version for version metadata
+	latestVersionInterface, err := cfg.db.GetLatestVersionNumber(req.Context(), table.SessionID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Convert interface{} to int32, handling different possible types
+	var latestVersion int32
+	switch v := latestVersionInterface.(type) {
+	case int32:
+		latestVersion = v
+	case int64:
+		latestVersion = int32(v)
+	case int:
+		latestVersion = int32(v)
+	default:
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Unexpected version number type: %T", latestVersionInterface))
+		return
+	}
+
+	// Parse the JSON response
+	var tableData map[string]interface{}
+	err = json.Unmarshal(table.ResponseJson, &tableData)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to parse table data")
+		return
+	}
+
+	// Create response with formatted table data and separate metadata
+	type tableResponse struct {
+		TableRows     []map[string]interface{} `json:"table_rows"`
+		VersionNumber int32                    `json:"version_number"`
+		CanUndo       bool                     `json:"can_undo"`
+		CanRedo       bool                     `json:"can_redo"`
+	}
+
+	response := tableResponse{
+		TableRows:     formatTableData(tableData),
+		VersionNumber: table.VersionNumber,
+		CanUndo:       table.VersionNumber > 1,
+		CanRedo:       table.VersionNumber < latestVersion,
+	}
+
+	respondWithJson(w, http.StatusOK, response)
 }
 
 func (cfg *apiConfig) updateTable(w http.ResponseWriter, req *http.Request) {
@@ -280,7 +337,50 @@ func (cfg *apiConfig) updateTable(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	respondWithJson(w, http.StatusOK, mapLlmResponse)
+	// Get updated table info to include version metadata
+	updatedTable, err := cfg.db.GetTableBasedOnSession(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Get the latest version number to determine if redo is available
+	latestVersionInterface, err := cfg.db.GetLatestVersionNumber(req.Context(), updatedTable.SessionID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Convert interface{} to int32, handling different possible types
+	var latestVersion int32
+	switch v := latestVersionInterface.(type) {
+	case int32:
+		latestVersion = v
+	case int64:
+		latestVersion = int32(v)
+	case int:
+		latestVersion = int32(v)
+	default:
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Unexpected version number type: %T", latestVersionInterface))
+		return
+	}
+
+	// Create response with formatted table data and metadata
+	type updateResponse struct {
+		TableRows     []map[string]interface{} `json:"table_rows"`
+		VersionNumber int32                    `json:"version_number"`
+		CanUndo       bool                     `json:"can_undo"`
+		CanRedo       bool                     `json:"can_redo"`
+	}
+
+	response := updateResponse{
+		TableRows:     formatTableData(mapLlmResponse),
+		VersionNumber: updatedTable.VersionNumber,
+		CanUndo:       updatedTable.VersionNumber > 1,
+		CanRedo:       updatedTable.VersionNumber < latestVersion,
+	}
+
+	respondWithJson(w, http.StatusOK, response)
 }
 
 func (cfg *apiConfig) undoTableVersion(w http.ResponseWriter, req *http.Request) {
@@ -322,7 +422,50 @@ func (cfg *apiConfig) undoTableVersion(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	respondWithJson(w, http.StatusOK, responseMap)
+	// Get updated table info for version metadata
+	updatedTable, err := cfg.db.GetTableBasedOnSession(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Get latest version for redo capability
+	latestVersionInterface, err := cfg.db.GetLatestVersionNumber(req.Context(), updatedTable.SessionID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Convert interface{} to int32, handling different possible types (undo function)
+	var latestVersion int32
+	switch v := latestVersionInterface.(type) {
+	case int32:
+		latestVersion = v
+	case int64:
+		latestVersion = int32(v)
+	case int:
+		latestVersion = int32(v)
+	default:
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Unexpected version number type: %T", latestVersionInterface))
+		return
+	}
+
+	// Create response with formatted table data and metadata
+	type undoResponse struct {
+		TableRows     []map[string]interface{} `json:"table_rows"`
+		VersionNumber int32                    `json:"version_number"`
+		CanUndo       bool                     `json:"can_undo"`
+		CanRedo       bool                     `json:"can_redo"`
+	}
+
+	undoResp := undoResponse{
+		TableRows:     formatTableData(responseMap),
+		VersionNumber: updatedTable.VersionNumber,
+		CanUndo:       updatedTable.VersionNumber > 1,
+		CanRedo:       updatedTable.VersionNumber < latestVersion,
+	}
+
+	respondWithJson(w, http.StatusOK, undoResp)
 }
 
 func (cfg *apiConfig) redoTableVersion(w http.ResponseWriter, req *http.Request) {
@@ -371,5 +514,48 @@ func (cfg *apiConfig) redoTableVersion(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	respondWithJson(w, http.StatusOK, responseMap)
+	// Get updated table info for version metadata
+	updatedTable, err := cfg.db.GetTableBasedOnSession(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Get latest version for redo capability
+	latestVersionInterface, err := cfg.db.GetLatestVersionNumber(req.Context(), updatedTable.SessionID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Convert interface{} to int32, handling different possible types (redo function)
+	var latestVersion int32
+	switch v := latestVersionInterface.(type) {
+	case int32:
+		latestVersion = v
+	case int64:
+		latestVersion = int32(v)
+	case int:
+		latestVersion = int32(v)
+	default:
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Unexpected version number type: %T", latestVersionInterface))
+		return
+	}
+
+	// Create response with formatted table data and metadata
+	type redoResponse struct {
+		TableRows     []map[string]interface{} `json:"table_rows"`
+		VersionNumber int32                    `json:"version_number"`
+		CanUndo       bool                     `json:"can_undo"`
+		CanRedo       bool                     `json:"can_redo"`
+	}
+
+	redoResp := redoResponse{
+		TableRows:     formatTableData(responseMap),
+		VersionNumber: updatedTable.VersionNumber,
+		CanUndo:       updatedTable.VersionNumber > 1,
+		CanRedo:       updatedTable.VersionNumber < latestVersion,
+	}
+
+	respondWithJson(w, http.StatusOK, redoResp)
 }

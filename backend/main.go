@@ -47,9 +47,12 @@ func main() {
 	mux.HandleFunc("PUT /api/tables/undo/{session_id}", apiConfig.undoTableVersion)
 	mux.HandleFunc("PUT /api/tables/redo/{session_id}", apiConfig.redoTableVersion)
 
+	// Wrap the mux with CORS middleware
+	handler := corsMiddleware(mux)
+
 	server := &http.Server{
 		Addr:    port,
-		Handler: mux,
+		Handler: handler,
 	}
 
 	fmt.Printf("Starting server on http://localhost%s\n", port)

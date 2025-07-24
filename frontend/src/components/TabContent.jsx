@@ -211,7 +211,7 @@ const TabContent = ({ sessionId }) => {
       )}
       
       <TableDisplay 
-        data={tableState?.data}
+        data={tableState?.rows}
         loading={loading || editLoading}
       />
     </div>
