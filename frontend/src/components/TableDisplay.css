@@ -1,0 +1,246 @@
+/* TableDisplay Component Styles */
+
+.table-container {
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.table-header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.table-header-section h3 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.table-info {
+  font-size: 0.875rem;
+  color: #6c757d;
+  background-color: #f8f9fa;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+}
+
+/* Table wrapper for horizontal scrolling */
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Main table styles */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.table-header {
+  background-color: #f8f9fa;
+  color: #495057;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid #dee2e6;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table-row {
+  transition: background-color 0.15s ease;
+}
+
+.table-row:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+.table-row:hover {
+  background-color: #e9ecef;
+}
+
+.table-cell {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #dee2e6;
+  vertical-align: top;
+  word-wrap: break-word;
+  max-width: 300px;
+}
+
+/* Special styling for key-value tables */
+.key-value-table .key-cell {
+  font-weight: 500;
+  background-color: #f8f9fa;
+  width: 30%;
+  min-width: 150px;
+}
+
+.key-value-table .value-cell {
+  width: 70%;
+}
+
+/* Loading state - now using TableSkeleton component */
+.table-loading-skeleton {
+  /* Additional styles for skeleton loading state if needed */
+}
+
+/* Empty state */
+.table-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  color: #6c757d;
+  background-color: #f8f9fa;
+  border: 1px dashed #dee2e6;
+  border-radius: 8px;
+}
+
+.table-empty p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .table-header-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .table-header-section h3 {
+    font-size: 1.1rem;
+  }
+  
+  .data-table {
+    font-size: 0.8rem;
+  }
+  
+  .table-header,
+  .table-cell {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .table-cell {
+    max-width: 200px;
+  }
+  
+  /* Stack key-value pairs on mobile */
+  .key-value-table .key-cell,
+  .key-value-table .value-cell {
+    width: 100%;
+    min-width: unset;
+  }
+}
+
+@media (max-width: 480px) {
+  .table-container {
+    margin-bottom: 1rem;
+  }
+  
+  .table-header-section h3 {
+    font-size: 1rem;
+  }
+  
+  .table-info {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+  }
+  
+  .data-table {
+    font-size: 0.75rem;
+  }
+  
+  .table-header,
+  .table-cell {
+    padding: 0.4rem 0.5rem;
+  }
+  
+  .table-cell {
+    max-width: 150px;
+  }
+  
+  .table-empty {
+    padding: 2rem 1rem;
+  }
+}
+
+/* Print styles */
+@media print {
+  .table-container {
+    break-inside: avoid;
+  }
+  
+  .table-wrapper {
+    overflow: visible;
+    border: 1px solid #000;
+  }
+  
+  .data-table {
+    font-size: 10pt;
+  }
+  
+  .table-header {
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
+  }
+  
+  .table-row:nth-child(even) {
+    background-color: #f8f8f8 !important;
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
+  }
+}
+
+/* Accessibility improvements */
+.data-table:focus-within {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+}
+
+.table-header {
+  user-select: none;
+}
+
+.table-cell {
+  user-select: text;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .table-wrapper {
+    border: 2px solid #000;
+  }
+  
+  .table-header {
+    background-color: #000;
+    color: #fff;
+    border-bottom: 2px solid #000;
+  }
+  
+  .table-cell {
+    border-bottom: 1px solid #000;
+  }
+  
+  .table-row:nth-child(even) {
+    background-color: #f0f0f0;
+  }
+  
+  .table-row:hover {
+    background-color: #e0e0e0;
+  }
+}
