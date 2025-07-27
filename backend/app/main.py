@@ -3,36 +3,23 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import tempfile
-from .request import process_pdf_file
+from pdf_to_prompt import convert_pdf_to_text
 
 app = FastAPI(
     title="PDF Data Extractor",
     description="Extract structured data from PDF documents using AI"
 )
 
-# Configure CORS for frontend integration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your frontend origin
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Directory to save extracted JSON data
-OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "c:/WolfsAI/output")
-
 @app.post("/extract-pdf-data/")
-async def extract_pdf_data(file: UploadFile = File(...), model: str = "gemma3:4b"):
+async def extract_pdf_data(file: UploadFile = File(...)):
     """
     Extract structured data from an uploaded PDF file
     
     Args:
         file: The uploaded PDF file
-        model: The AI model to use for extraction
         
     Returns:
-        JSON with extracted data
+        pdf converted to text
     """
     # Validate file type
     if not file.filename.endswith('.pdf'):
@@ -46,11 +33,7 @@ async def extract_pdf_data(file: UploadFile = File(...), model: str = "gemma3:4b
             temp_file.write(contents)
         
         # Process the PDF
-        result = process_pdf_file(
-            file_path=temp_path,
-            save_dir=OUTPUT_DIR,
-            model=model
-        )
+        result = convert_pdf_to_text(temp_path)
         
         # Remove temporary file
         os.unlink(temp_path)
@@ -59,9 +42,7 @@ async def extract_pdf_data(file: UploadFile = File(...), model: str = "gemma3:4b
             status_code=200,
             content={
                 "status": "success",
-                "filename": file.filename,
-                "output_path": result["file_path"],
-                "data": result["data"]
+                "data": result
             }
         )
     except Exception as e:

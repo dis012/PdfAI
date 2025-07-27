@@ -17,7 +17,3 @@ def convert_pdf_to_text(file, concatenate=True):
         return None if concatenate else {}
         
     return document_content
-
-# if __name__ == "__main__":
-#     text = convert_pdf_to_text(r"C:\WolfsAI\backend\TestCases\Zdruzeno.pdf")
-#     print(text)

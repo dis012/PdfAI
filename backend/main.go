@@ -21,7 +21,7 @@ func main() {
 	}
 
 	dbUrl := os.Getenv("DB_URL")
-	ollamaEndpoint := os.Getenv("OLLAMA_ENDPOINT")
+	//ollamaEndpoint := os.Getenv("OLLAMA_ENDPOINT")
 
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
@@ -33,7 +33,6 @@ func main() {
 	apiConfig := &apiConfig{
 		db:          dbQueries,
 		maxFileSize: 50,
-		ollamaURL:   ollamaEndpoint,
 	}
 
 	mux := http.NewServeMux()

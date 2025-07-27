@@ -9,17 +9,17 @@ docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
 docker run -d --gpus all -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
 
 # Pull the model
-docker exec -it ollama ollama pull gemma3n:4b
+docker exec -it ollama ollama pull gemma3n:e2b
 
 # Example request
 curl http://localhost:11434/api/generate -d '{
-  "model": "gemma3n:4b",
-  "prompt": "",
+  "model": "gemma3n:e2b",
+  "prompt": "Say something nice.",
   "stream": false
 }'
 
 
-curl -v -X POST -F "pdf=@/home/adis/Projects/PdfAI/backend/TestCases/tesEmail.pdf" http://localhost:8080/api/upload
+curl -v -X POST -F "pdf=@/Users/adisskrijelj/Documents/pooblastilo.pdf" http://localhost:8080/api/upload
 
 curl -v -X GET http://localhost:8080/api/tables/843c0509-cd7c-40fb-9e39-9843b413eeb7
 

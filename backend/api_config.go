@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github/dis012/PDFAI/internal/database"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/genai"
 )
 
 type apiConfig struct {
@@ -83,47 +86,63 @@ func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Re
 		return
 	}
 
-	model_config := OllamaRequest{
-		Model:  "gemma3n:e4b",
-		Prompt: fmt.Sprintf("%v %v", prompt, email.EmailText),
-		Stream: false,
-	}
-
-	model_response := OllamaResponse{}
-
-	ollama_request, err := json.Marshal(model_config)
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, nil)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
-		return
+		log.Fatal(err)
 	}
 
-	req_body := strings.NewReader(string(ollama_request))
-	r, err := http.NewRequest(http.MethodPost, cfg.ollamaURL, req_body)
+	result, err := client.Models.GenerateContent(
+		ctx,
+		"gemini-2.0-flash",
+		genai.Text(fmt.Sprintf("%v %v", prompt, email.EmailText)),
+		nil,
+	)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
-		return
+		log.Fatal(err)
 	}
 
-	res, err := http.DefaultClient.Do(r)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	defer res.Body.Close()
+	// model_config := OllamaRequest{
+	// 	Model:  "gemma3n:e2b",
+	// 	Prompt: fmt.Sprintf("%v %v", prompt, email.EmailText),
+	// 	Stream: false,
+	// }
 
-	body_bytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to read response body")
-		return
-	}
+	// model_response := OllamaResponse{}
 
-	err = json.Unmarshal(body_bytes, &model_response)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to unmarshal response body")
-		return
-	}
+	// ollama_request, err := json.Marshal(model_config)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusBadRequest, err.Error())
+	// 	return
+	// }
 
-	jsonLlmResponse, mapLlmResponse, err := cleanJsonString(model_response.Response)
+	// req_body := strings.NewReader(string(ollama_request))
+	// r, err := http.NewRequest(http.MethodPost, cfg.ollamaURL, req_body)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusBadRequest, err.Error())
+	// 	return
+	// }
+
+	// res, err := http.DefaultClient.Do(r)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusBadRequest, err.Error())
+	// 	return
+	// }
+	// defer res.Body.Close()
+
+	// body_bytes, err := io.ReadAll(res.Body)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusInternalServerError, "Failed to read response body")
+	// 	return
+	// }
+
+	// err = json.Unmarshal(body_bytes, &model_response)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusInternalServerError, "Failed to unmarshal response body")
+	// 	return
+	// }
+
+	jsonLlmResponse, mapLlmResponse, err := cleanJsonString(result.Text())
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
@@ -276,47 +295,63 @@ func (cfg *apiConfig) updateTable(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	model_config := OllamaRequest{
-		Model:  "gemma3n:e4b",
-		Prompt: fmt.Sprintf("%v\n %v\n %v\n %v", updateTablePrompt, email, string(table.ResponseJson), params.Prompt),
-		Stream: false,
-	}
-
-	model_response := OllamaResponse{}
-
-	ollama_request, err := json.Marshal(model_config)
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, nil)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
-		return
+		log.Fatal(err)
 	}
 
-	req_body := strings.NewReader(string(ollama_request))
-	r, err := http.NewRequest(http.MethodPost, cfg.ollamaURL, req_body)
+	result, err := client.Models.GenerateContent(
+		ctx,
+		"gemini-2.0-flash",
+		genai.Text(fmt.Sprintf("%v\n %v\n %v\n %v", updateTablePrompt, email, string(table.ResponseJson), params.Prompt)),
+		nil,
+	)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
-		return
+		log.Fatal(err)
 	}
 
-	res, err := http.DefaultClient.Do(r)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	defer res.Body.Close()
+	// model_config := OllamaRequest{
+	// 	Model:  "gemma3n:e4b",
+	// 	Prompt: fmt.Sprintf("%v\n %v\n %v\n %v", updateTablePrompt, email, string(table.ResponseJson), params.Prompt),
+	// 	Stream: false,
+	// }
 
-	body_bytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to read response body")
-		return
-	}
+	// model_response := OllamaResponse{}
 
-	err = json.Unmarshal(body_bytes, &model_response)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to unmarshal response body")
-		return
-	}
+	// ollama_request, err := json.Marshal(model_config)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusBadRequest, err.Error())
+	// 	return
+	// }
 
-	jsonLlmResponse, mapLlmResponse, err := cleanJsonString(model_response.Response)
+	// req_body := strings.NewReader(string(ollama_request))
+	// r, err := http.NewRequest(http.MethodPost, cfg.ollamaURL, req_body)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusBadRequest, err.Error())
+	// 	return
+	// }
+
+	// res, err := http.DefaultClient.Do(r)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusBadRequest, err.Error())
+	// 	return
+	// }
+	// defer res.Body.Close()
+
+	// body_bytes, err := io.ReadAll(res.Body)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusInternalServerError, "Failed to read response body")
+	// 	return
+	// }
+
+	// err = json.Unmarshal(body_bytes, &model_response)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusInternalServerError, "Failed to unmarshal response body")
+	// 	return
+	// }
+
+	jsonLlmResponse, mapLlmResponse, err := cleanJsonString(result.Text())
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return

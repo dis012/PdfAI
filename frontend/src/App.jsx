@@ -57,7 +57,7 @@ function App() {
       title: uploadResponse.title || uploadResponse.filename || `Session ${Date.now()}`,
       created_at: uploadResponse.created_at || new Date().toISOString()
     }
-    
+
     setSessions(prev => [...prev, newSession])
     setActiveSessionId(newSession.id)
     showSuccessToast(`Successfully uploaded ${newSession.title}`)
@@ -78,34 +78,34 @@ function App() {
   }
 
   return (
-    <ErrorBoundary 
+    <ErrorBoundary
       context="Application"
       onError={handleGlobalError}
       userMessage="Something went wrong with the application. Please try refreshing the page."
     >
       <div className="app">
-        <ErrorBoundary 
+        <ErrorBoundary
           context="Sidebar"
           userMessage="There was an issue with the file upload area."
         >
-          <Sidebar 
+          <Sidebar
             onUploadSuccess={handleUploadSuccess}
             onUploadError={handleUploadError}
           />
         </ErrorBoundary>
-        
-        <ErrorBoundary 
+
+        <ErrorBoundary
           context="MainContent"
           userMessage="There was an issue displaying the table content."
         >
-          <MainContent 
+          <MainContent
             sessions={sessions}
             activeSessionId={activeSessionId}
             onTabSelect={handleTabSelect}
             loading={loading}
           />
         </ErrorBoundary>
-        
+
         <ToastContainer ref={toastContainerRef} />
       </div>
     </ErrorBoundary>
