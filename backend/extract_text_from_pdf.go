@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -33,8 +34,14 @@ func extractTextWithPdfToText(pdfData []byte) (string, error) {
 		return "", fmt.Errorf("failed to close multipart writer: %v", err)
 	}
 
+	// Get Python API URL from environment
+	pythonAPIURL := os.Getenv("PYTHON_API_URL")
+	if pythonAPIURL == "" {
+		pythonAPIURL = "http://localhost:8001" // fallback default
+	}
+	
 	// Create HTTP request
-	req, err := http.NewRequest("POST", "http://localhost:8000/extract-pdf-data/", &requestBody)
+	req, err := http.NewRequest("POST", pythonAPIURL+"/extract-pdf-data/", &requestBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to create HTTP request: %v", err)
 	}

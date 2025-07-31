@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 REM PdfAI Docker Deployment Script for Windows
 REM This script helps you deploy the entire PdfAI application using Docker
 

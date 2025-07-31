@@ -33,9 +33,6 @@ COPY --from=builder /app/main .
 # Copy environment file for Docker
 COPY --from=builder /app/.env.docker ./.env
 
-# Copy any other necessary files
-COPY --from=builder /app/TestCases ./TestCases
-
 # Expose port
 EXPOSE 8080
 
