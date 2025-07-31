@@ -1,0 +1,16 @@
+# Ignore unnecessary files during Docker build
+.git
+.gitignore
+README.md
+Dockerfile*
+.dockerignore
+node_modules
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.log
+.DS_Store
+*.tmp
+*.temp

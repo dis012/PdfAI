@@ -31,20 +31,28 @@ func main() {
 	dbQueries := database.New(db)
 
 	apiConfig := &apiConfig{
-		db:          dbQueries,
-		maxFileSize: 50,
+		db: dbQueries,
 	}
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /api/upload", apiConfig.uploadAndPromptHandler)
+	mux.HandleFunc("POST /api/chat/{session_id}", apiConfig.createReply)
 
 	mux.HandleFunc("GET /api/sessions", apiConfig.getSessions)
 	mux.HandleFunc("GET /api/tables/{session_id}", apiConfig.getTableSession)
+	mux.HandleFunc("GET /api/chat/{session_id}", apiConfig.getChat)
 
 	mux.HandleFunc("PUT /api/tables/{session_id}", apiConfig.updateTable)
 	mux.HandleFunc("PUT /api/tables/undo/{session_id}", apiConfig.undoTableVersion)
 	mux.HandleFunc("PUT /api/tables/redo/{session_id}", apiConfig.redoTableVersion)
+	mux.HandleFunc("PUT /api/chat/{session_id}", apiConfig.editReply)
+
+	// Health check endpoint
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
 
 	// Wrap the mux with CORS middleware
 	handler := corsMiddleware(mux)

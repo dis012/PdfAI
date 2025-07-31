@@ -10,6 +10,20 @@ app = FastAPI(
     description="Extract structured data from PDF documents using AI"
 )
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "ok", "message": "PDF processing service is running"}
+
 @app.post("/extract-pdf-data/")
 async def extract_pdf_data(file: UploadFile = File(...)):
     """
