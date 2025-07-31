@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: pdfai_postgres
+    environment:
+      POSTGRES_DB: pdfai
+      POSTGRES_USER: pdfai_user
+      POSTGRES_PASSWORD: pdfai_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - pdfai_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pdfai_user -d pdfai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Go Backend API
+  go_backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.go
+    container_name: pdfai_go_backend
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: postgres://pdfai_user:pdfai_password@postgres:5432/pdfai?sslmode=disable
+      PYTHON_API_URL: http://python_backend:8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      python_backend:
+        condition: service_started
+    networks:
+      - pdfai_network
+    volumes:
+      - ./backend/TestCases:/app/TestCases
+
+  # Python Backend for PDF Processing
+  python_backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.python
+    container_name: pdfai_python_backend
+    ports:
+      - "8001:8001"
+    networks:
+      - pdfai_network
+    volumes:
+      - ./backend/TestCases:/app/TestCases
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pdfai_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:8080
+      VITE_PYTHON_API_URL: http://localhost:8001
+    depends_on:
+      - go_backend
+      - python_backend
+    networks:
+      - pdfai_network
+
+networks:
+  pdfai_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

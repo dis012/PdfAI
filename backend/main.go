@@ -48,6 +48,12 @@ func main() {
 	mux.HandleFunc("PUT /api/tables/redo/{session_id}", apiConfig.redoTableVersion)
 	mux.HandleFunc("PUT /api/chat/{session_id}", apiConfig.editReply)
 
+	// Health check endpoint
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
 	// Wrap the mux with CORS middleware
 	handler := corsMiddleware(mux)
 
