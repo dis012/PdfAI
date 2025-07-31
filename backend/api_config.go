@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github/dis012/PDFAI/internal/database"
@@ -16,9 +17,8 @@ import (
 )
 
 type apiConfig struct {
-	db          *database.Queries
-	maxFileSize int64
-	ollamaURL   string
+	db *database.Queries
+	//ollamaURL string
 }
 
 const prompt = `Extract all relevant data and key details from the following text. Return the extracted information in a well-structured and
@@ -29,15 +29,27 @@ const updateTablePrompt = `You are an AI assistant that modifies a JSON object b
 Maintain the original structure of the JSON. Only modify the data as requested by the user's instruction.
 Do not add any commentary, explanations, or markdown fences like json. No matter what happens DO NOT respond with anything else then JSON. Only output the final JSON. I will provide you with the email, current json table and users new request:`
 
-func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Request) {
-	err := req.ParseMultipartForm(cfg.maxFileSize)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
+const replyToEmailPrompt = `You are an assistant skilled in professional communication. Your task is to draft a clear, concise, and appropriate reply to the email provided at the end of this prompt user also provided you with informations to include in the reply.
+Instructions:
+- Address the sender appropriately based on their tone and role.
+- Acknowledge any questions, requests, or concerns in the email.
+- Provide helpful, professional responses using a polite and confident tone.
+- If more information is needed to respond, politely request clarification.
+- Keep the reply well-structured: use paragraphs, bullets, or numbering where helpful.
+- Sign off with an appropriate closing.
+- Consider the information that user wants to address in the reply
+Now, reply to the following email and include users requests specified at the end:`
 
+const editReply = `You are an assistant skilled in professional communication. User wants you to edit the reply you created. Bellow the following data will be specified:
+- Email
+- Reply that user wants you to fix
+- How to fix it
+Now create a new better reply based on users needs.
+`
+
+func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Request) {
 	// Limit file size to 50MB
-	err = req.ParseMultipartForm(10 << 20)
+	err := req.ParseMultipartForm(10 << 20)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
@@ -593,4 +605,146 @@ func (cfg *apiConfig) redoTableVersion(w http.ResponseWriter, req *http.Request)
 	}
 
 	respondWithJson(w, http.StatusOK, redoResp)
+}
+
+func (cfg *apiConfig) createReply(w http.ResponseWriter, req *http.Request) {
+	type request_params struct {
+		Prompt string `json:"prompt"`
+	}
+
+	params := request_params{}
+	decoder := json.NewDecoder(req.Body)
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	sessionId, err := uuid.Parse(req.PathValue("session_id"))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found")
+		return
+	}
+
+	session, err := cfg.db.GetSessionById(req.Context(), sessionId)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	email, err := cfg.db.GetEmailById(req.Context(), session.EmailID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	result, err := client.Models.GenerateContent(
+		ctx,
+		"gemini-2.0-flash",
+		genai.Text(fmt.Sprintf("%v\n %v\n %v\n", replyToEmailPrompt, email, params.Prompt)),
+		nil,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	chat, err := cfg.db.SaveNewChat(req.Context(), database.SaveNewChatParams{
+		SessionID: uuid.NullUUID{UUID: sessionId, Valid: true},
+		Prompt:    sql.NullString{String: params.Prompt, Valid: true},
+		Response:  sql.NullString{String: result.Text(), Valid: true},
+	})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, chat)
+}
+
+func (cfg *apiConfig) editReply(w http.ResponseWriter, req *http.Request) {
+	type request_params struct {
+		Prompt string `json:"prompt"`
+	}
+
+	params := request_params{}
+	decoder := json.NewDecoder(req.Body)
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	sessionId, err := uuid.Parse(req.PathValue("session_id"))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found")
+		return
+	}
+
+	session, err := cfg.db.GetSessionById(req.Context(), sessionId)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	email, err := cfg.db.GetEmailById(req.Context(), session.EmailID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	chat, err := cfg.db.GetChatHistory(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	result, err := client.Models.GenerateContent(
+		ctx,
+		"gemini-2.0-flash",
+		genai.Text(fmt.Sprintf("%v\n %v\n %v\n %v", editReply, email, chat.Response, params.Prompt)),
+		nil,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	newChat, err := cfg.db.UpdateTable(req.Context(), database.UpdateTableParams{
+		Response: sql.NullString{String: result.Text(), Valid: true},
+		ID:       chat.ID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, newChat)
+}
+
+func (cfg *apiConfig) getChat(w http.ResponseWriter, req *http.Request) {
+	sessionId, err := uuid.Parse(req.PathValue("session_id"))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found")
+		return
+	}
+
+	chat, err := cfg.db.GetChatHistory(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, chat)
 }

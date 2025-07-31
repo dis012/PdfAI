@@ -1,5 +1,5 @@
--- name: GetChatHistory :many
-SELECT prompt, response FROM chat
+-- name: GetChatHistory :one
+SELECT * FROM chat
 WHERE session_id = $1
 ORDER BY created_at ASC;
 
@@ -12,4 +12,10 @@ VALUES(
     $3,
     NOW()
 )
+RETURNING *;
+
+-- name: UpdateTable :one
+UPDATE chat
+SET response = $1
+WHERE id = $2
 RETURNING *;

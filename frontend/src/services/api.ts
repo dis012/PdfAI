@@ -3,6 +3,8 @@ import {
   TableData,
   TableState,
   EditRequest,
+  ChatRequest,
+  Chat,
   UploadResponse,
   SessionsResponse,
   TableResponse,
@@ -306,6 +308,122 @@ export async function redoTableEdit(sessionId: string): Promise<ApiResult<TableS
       baseDelay: 1000,
       onRetry: (attempt) => {
         console.log(`Retrying redoTableEdit for session ${sessionId} (attempt ${attempt + 1})`);
+      }
+    }
+  );
+
+  return {
+    success: retryResult.success,
+    data: retryResult.data,
+    error: retryResult.error
+  };
+}
+
+// ===== CHAT ENDPOINTS =====
+
+/**
+ * Get chat/reply for a session
+ */
+export async function getChat(sessionId: string): Promise<ApiResult<Chat>> {
+  const retryResult = await retryApiCall(
+    async () => {
+      const result = await apiRequest<any>(`/chat/${sessionId}`);
+      if (result.success && result.data) {
+        // Validate and convert chat data - handle Go struct field names
+        const chat: Chat = {
+          id: result.data.ID || result.data.id,
+          session_id: result.data.SessionID?.UUID || result.data.session_id,
+          prompt: result.data.Prompt?.String || result.data.prompt || '',
+          response: result.data.Response?.String || result.data.response || '',
+          created_at: result.data.CreatedAt || result.data.created_at
+        };
+        return { success: true, data: chat };
+      }
+      return { success: false, error: result.error };
+    },
+    {
+      maxAttempts: 3,
+      baseDelay: 1000,
+      onRetry: (attempt) => {
+        console.log(`Retrying getChat for session ${sessionId} (attempt ${attempt + 1})`);
+      }
+    }
+  );
+
+  return {
+    success: retryResult.success,
+    data: retryResult.data,
+    error: retryResult.error
+  };
+}
+
+/**
+ * Create a new reply for a session
+ */
+export async function createReply(sessionId: string, request: ChatRequest): Promise<ApiResult<Chat>> {
+  const retryResult = await retryApiCall(
+    async () => {
+      const result = await apiRequest<any>(`/chat/${sessionId}`, {
+        method: 'POST',
+        body: JSON.stringify(request)
+      });
+      if (result.success && result.data) {
+        // Validate and convert chat data - handle Go struct field names
+        const chat: Chat = {
+          id: result.data.ID || result.data.id,
+          session_id: result.data.SessionID?.UUID || result.data.session_id,
+          prompt: result.data.Prompt?.String || result.data.prompt || '',
+          response: result.data.Response?.String || result.data.response || '',
+          created_at: result.data.CreatedAt || result.data.created_at
+        };
+        return { success: true, data: chat };
+      }
+      return { success: false, error: result.error };
+    },
+    {
+      maxAttempts: 2,
+      baseDelay: 1000,
+      onRetry: (attempt) => {
+        console.log(`Retrying createReply for session ${sessionId} (attempt ${attempt + 1})`);
+      }
+    }
+  );
+
+  return {
+    success: retryResult.success,
+    data: retryResult.data,
+    error: retryResult.error
+  };
+}
+
+/**
+ * Edit an existing reply
+ */
+export async function editReply(sessionId: string, request: ChatRequest): Promise<ApiResult<Chat>> {
+  const retryResult = await retryApiCall(
+    async () => {
+      const result = await apiRequest<any>(`/chat/${sessionId}`, {
+        method: 'PUT',
+        body: JSON.stringify(request)
+      });
+      if (result.success && result.data) {
+        // Validate and convert chat data - handle Go struct field names
+        const chat: Chat = {
+          id: result.data.ID || result.data.id,
+          session_id: result.data.SessionID?.UUID || result.data.session_id,
+          prompt: result.data.Prompt?.String || result.data.prompt || '',
+          response: result.data.Response?.String || result.data.response || '',
+          created_at: result.data.CreatedAt || result.data.created_at
+        };
+        return { success: true, data: chat };
+      }
+      return { success: false, error: result.error };
+    },
+    {
+      maxAttempts: 2,
+      baseDelay: 1000,
+      onRetry: (attempt) => {
+        console.log(`Retrying editReply for session ${sessionId} (attempt ${attempt + 1})`);
       }
     }
   );

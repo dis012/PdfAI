@@ -25,8 +25,25 @@ export interface TableState {
   versionNumber: number;
 }
 
+export interface Chat {
+  id: string;           // UUID
+  session_id: string;   // UUID
+  prompt: string;       // User's prompt
+  response: string;     // AI's response
+  created_at: string;   // ISO timestamp
+}
+
+export interface ChatState {
+  chat: Chat | null;
+  isLoading: boolean;
+}
+
 // API Request Types
 export interface EditRequest {
+  prompt: string;
+}
+
+export interface ChatRequest {
   prompt: string;
 }
 

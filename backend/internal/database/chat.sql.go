@@ -12,38 +12,23 @@ import (
 	"github.com/google/uuid"
 )
 
-const getChatHistory = `-- name: GetChatHistory :many
-SELECT prompt, response FROM chat
+const getChatHistory = `-- name: GetChatHistory :one
+SELECT id, session_id, prompt, response, created_at FROM chat
 WHERE session_id = $1
 ORDER BY created_at ASC
 `
 
-type GetChatHistoryRow struct {
-	Prompt   sql.NullString
-	Response sql.NullString
-}
-
-func (q *Queries) GetChatHistory(ctx context.Context, sessionID uuid.NullUUID) ([]GetChatHistoryRow, error) {
-	rows, err := q.db.QueryContext(ctx, getChatHistory, sessionID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetChatHistoryRow
-	for rows.Next() {
-		var i GetChatHistoryRow
-		if err := rows.Scan(&i.Prompt, &i.Response); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) GetChatHistory(ctx context.Context, sessionID uuid.NullUUID) (Chat, error) {
+	row := q.db.QueryRowContext(ctx, getChatHistory, sessionID)
+	var i Chat
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.Prompt,
+		&i.Response,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const saveNewChat = `-- name: SaveNewChat :one
@@ -66,6 +51,31 @@ type SaveNewChatParams struct {
 
 func (q *Queries) SaveNewChat(ctx context.Context, arg SaveNewChatParams) (Chat, error) {
 	row := q.db.QueryRowContext(ctx, saveNewChat, arg.SessionID, arg.Prompt, arg.Response)
+	var i Chat
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.Prompt,
+		&i.Response,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateTable = `-- name: UpdateTable :one
+UPDATE chat
+SET response = $1
+WHERE id = $2
+RETURNING id, session_id, prompt, response, created_at
+`
+
+type UpdateTableParams struct {
+	Response sql.NullString
+	ID       uuid.UUID
+}
+
+func (q *Queries) UpdateTable(ctx context.Context, arg UpdateTableParams) (Chat, error) {
+	row := q.db.QueryRowContext(ctx, updateTable, arg.Response, arg.ID)
 	var i Chat
 	err := row.Scan(
 		&i.ID,

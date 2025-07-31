@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import TableDisplay from './TableDisplay';
 import EditControls from './EditControls';
+import ReplyControls from './ReplyControls';
 import InlineError from './InlineError';
 import LoadingSpinner from './LoadingSpinner';
-import { getTableData, editTable, undoTableEdit, redoTableEdit } from '../services/api';
+import { getTableData, editTable, undoTableEdit, redoTableEdit, getChat, createReply, editReply } from '../services/api';
 import { showErrorToast, showSuccessToast } from './ToastContainer';
 import { logError } from '../utils/errorHandling';
 import './TabContent.css';
 
 const TabContent = ({ sessionId }) => {
   const [tableState, setTableState] = useState(null);
+  const [chatData, setChatData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [error, setError] = useState(null);
   const [editError, setEditError] = useState(null);
+  const [chatError, setChatError] = useState(null);
 
   // Fetch table data when sessionId changes
   useEffect(() => {
@@ -50,8 +54,88 @@ const TabContent = ({ sessionId }) => {
       }
     };
 
+    const fetchChatData = async () => {
+      setChatLoading(true);
+      setChatError(null);
+      
+      try {
+        const result = await getChat(sessionId);
+        
+        if (result.success && result.data) {
+          setChatData(result.data);
+        } else {
+          // No chat data exists yet, which is normal
+          setChatData(null);
+        }
+      } catch (err) {
+        // Chat not existing is not an error
+        setChatData(null);
+      } finally {
+        setChatLoading(false);
+      }
+    };
+
     fetchTableData();
+    fetchChatData();
   }, [sessionId]);
+
+  // Handle create reply operation
+  const handleCreateReply = async (prompt) => {
+    if (!sessionId || !prompt.trim()) return;
+
+    setChatLoading(true);
+    setChatError(null);
+
+    try {
+      const result = await createReply(sessionId, { prompt: prompt.trim() });
+      
+      if (result.success && result.data) {
+        setChatData(result.data);
+        showSuccessToast('Reply generated successfully');
+      } else {
+        const errorMessage = result.error || 'Failed to create reply';
+        setChatError(errorMessage);
+        logError(new Error(errorMessage), 'TabContent.handleCreateReply');
+        showErrorToast(errorMessage);
+      }
+    } catch (err) {
+      const errorMessage = 'An unexpected error occurred while creating the reply';
+      logError(err, 'TabContent.handleCreateReply');
+      setChatError(errorMessage);
+      showErrorToast(errorMessage);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  // Handle edit reply operation
+  const handleEditReply = async (prompt) => {
+    if (!sessionId || !prompt.trim()) return;
+
+    setChatLoading(true);
+    setChatError(null);
+
+    try {
+      const result = await editReply(sessionId, { prompt: prompt.trim() });
+      
+      if (result.success && result.data) {
+        setChatData(result.data);
+        showSuccessToast('Reply updated successfully');
+      } else {
+        const errorMessage = result.error || 'Failed to edit reply';
+        setChatError(errorMessage);
+        logError(new Error(errorMessage), 'TabContent.handleEditReply');
+        showErrorToast(errorMessage);
+      }
+    } catch (err) {
+      const errorMessage = 'An unexpected error occurred while editing the reply';
+      logError(err, 'TabContent.handleEditReply');
+      setChatError(errorMessage);
+      showErrorToast(errorMessage);
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   // Handle edit table operation
   const handleEdit = async (prompt) => {
@@ -207,6 +291,23 @@ const TabContent = ({ sessionId }) => {
           onRetry={() => setEditError(null)}
           retryText="Dismiss"
           className="edit-error"
+        />
+      )}
+
+      <ReplyControls
+        onCreateReply={handleCreateReply}
+        onEditReply={handleEditReply}
+        chatData={chatData}
+        loading={chatLoading}
+        disabled={!sessionId}
+      />
+      
+      {chatError && (
+        <InlineError 
+          error={chatError}
+          onRetry={() => setChatError(null)}
+          retryText="Dismiss"
+          className="chat-error"
         />
       )}
       
