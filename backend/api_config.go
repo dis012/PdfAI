@@ -18,7 +18,7 @@ import (
 
 type apiConfig struct {
 	db *database.Queries
-	//ollamaURL string
+	// ollamaURL string
 }
 
 const prompt = `Extract all relevant data and key details from the following text. Return the extracted information in a well-structured and
@@ -46,6 +46,22 @@ const editReply = `You are an assistant skilled in professional communication. U
 - How to fix it
 Now create a new better reply based on users needs.
 `
+
+const answerEmailQuestionPrompt = `You are an AI assistant that helps users understand and extract information from emails. Your task is to answer the user's question based ONLY on the content of the email provided below.
+
+Instructions:
+- Answer accurately and concisely based on the email content
+- If the information is not present in the email, clearly state that
+- Reference specific parts of the email when relevant
+- Maintain a helpful and professional tone
+- If you have context from previous messages in the conversation, use it to provide better answers
+
+You will be provided with:
+- The original email content
+- The conversation history (if any)
+- The user's current question
+
+Now answer the user's question about the email:`
 
 func (cfg *apiConfig) uploadAndPromptHandler(w http.ResponseWriter, req *http.Request) {
 	// Limit file size to 50MB
@@ -740,11 +756,137 @@ func (cfg *apiConfig) getChat(w http.ResponseWriter, req *http.Request) {
 	}
 
 	chat, err := cfg.db.GetChatHistory(req.Context(), uuid.NullUUID{UUID: sessionId, Valid: true})
-
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	respondWithJson(w, http.StatusOK, chat)
+}
+
+func (cfg *apiConfig) askQuestion(w http.ResponseWriter, req *http.Request) {
+	type request_params struct {
+		Question string `json:"question"`
+	}
+
+	params := request_params{}
+	decoder := json.NewDecoder(req.Body)
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if params.Question == "" {
+		respondWithError(w, http.StatusBadRequest, "Question cannot be empty")
+		return
+	}
+
+	sessionId, err := uuid.Parse(req.PathValue("session_id"))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found")
+		return
+	}
+
+	// Get the session and email
+	session, err := cfg.db.GetSessionById(req.Context(), sessionId)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	email, err := cfg.db.GetEmailById(req.Context(), session.EmailID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Get conversation history
+	conversationHistory, err := cfg.db.GetConversationHistory(req.Context(), sessionId)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Build conversation context for AI
+	var conversationContext strings.Builder
+	conversationContext.WriteString(fmt.Sprintf("Email Content:\n%s\n\n", email))
+
+	if len(conversationHistory) > 0 {
+		conversationContext.WriteString("Previous Conversation:\n")
+		for _, msg := range conversationHistory {
+			if msg.Role == "user" {
+				conversationContext.WriteString(fmt.Sprintf("User: %s\n", msg.Content))
+			} else {
+				conversationContext.WriteString(fmt.Sprintf("Assistant: %s\n", msg.Content))
+			}
+		}
+		conversationContext.WriteString("\n")
+	}
+
+	conversationContext.WriteString(fmt.Sprintf("Current Question: %s", params.Question))
+
+	// Call Gemini AI
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	result, err := client.Models.GenerateContent(
+		ctx,
+		"gemini-2.0-flash",
+		genai.Text(fmt.Sprintf("%s\n\n%s", answerEmailQuestionPrompt, conversationContext.String())),
+		nil,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Save user question
+	_, err = cfg.db.SaveConversationMessage(req.Context(), database.SaveConversationMessageParams{
+		SessionID: sessionId,
+		Role:      "user",
+		Content:   params.Question,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Failed to save question")
+		return
+	}
+
+	// Save AI response
+	_, err = cfg.db.SaveConversationMessage(req.Context(), database.SaveConversationMessageParams{
+		SessionID: sessionId,
+		Role:      "assistant",
+		Content:   result.Text(),
+	})
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Failed to save response")
+		return
+	}
+
+	// Get updated conversation history
+	updatedHistory, err := cfg.db.GetConversationHistory(req.Context(), sessionId)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, updatedHistory)
+}
+
+func (cfg *apiConfig) getConversation(w http.ResponseWriter, req *http.Request) {
+	sessionId, err := uuid.Parse(req.PathValue("session_id"))
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found")
+		return
+	}
+
+	conversation, err := cfg.db.GetConversationHistory(req.Context(), sessionId)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, conversation)
 }

@@ -10,7 +10,9 @@ import {
   TableResponse,
   ErrorResponse,
   ApiResult,
-  UploadFile
+  UploadFile,
+  ConversationMessage,
+  ConversationRequest
 } from '../types';
 import {
   validateSessionsResponse,
@@ -424,6 +426,88 @@ export async function editReply(sessionId: string, request: ChatRequest): Promis
       baseDelay: 1000,
       onRetry: (attempt) => {
         console.log(`Retrying editReply for session ${sessionId} (attempt ${attempt + 1})`);
+      }
+    }
+  );
+
+  return {
+    success: retryResult.success,
+    data: retryResult.data,
+    error: retryResult.error
+  };
+}
+
+// ===== CONVERSATION Q&A ENDPOINTS =====
+
+/**
+ * Get conversation history for a session
+ */
+export async function getConversation(sessionId: string): Promise<ApiResult<ConversationMessage[]>> {
+  const retryResult = await retryApiCall(
+    async () => {
+      const result = await apiRequest<any>(`/conversation/${sessionId}`);
+      if (result.success && result.data) {
+        // Validate and convert conversation messages - handle Go struct field names
+        const messages: ConversationMessage[] = (Array.isArray(result.data) ? result.data : []).map((msg: any) => ({
+          id: msg.ID || msg.id,
+          session_id: msg.SessionID || msg.session_id,
+          role: msg.Role || msg.role,
+          content: msg.Content || msg.content,
+          message_order: msg.MessageOrder || msg.message_order,
+          created_at: msg.CreatedAt || msg.created_at
+        }));
+        return { success: true, data: messages };
+      }
+      return { success: false, error: result.error };
+    },
+    {
+      maxAttempts: 3,
+      baseDelay: 1000,
+      onRetry: (attempt) => {
+        console.log(`Retrying getConversation for session ${sessionId} (attempt ${attempt + 1})`);
+      }
+    }
+  );
+
+  return {
+    success: retryResult.success,
+    data: retryResult.data,
+    error: retryResult.error
+  };
+}
+
+/**
+ * Ask a question about the email content
+ */
+export async function askQuestion(
+  sessionId: string,
+  request: ConversationRequest
+): Promise<ApiResult<ConversationMessage[]>> {
+  const retryResult = await retryApiCall(
+    async () => {
+      const result = await apiRequest<any>(`/conversation/${sessionId}`, {
+        method: 'POST',
+        body: JSON.stringify(request)
+      });
+      if (result.success && result.data) {
+        // Backend returns full conversation history after adding new message
+        const messages: ConversationMessage[] = (Array.isArray(result.data) ? result.data : []).map((msg: any) => ({
+          id: msg.ID || msg.id,
+          session_id: msg.SessionID || msg.session_id,
+          role: msg.Role || msg.role,
+          content: msg.Content || msg.content,
+          message_order: msg.MessageOrder || msg.message_order,
+          created_at: msg.CreatedAt || msg.created_at
+        }));
+        return { success: true, data: messages };
+      }
+      return { success: false, error: result.error };
+    },
+    {
+      maxAttempts: 2, // Fewer retries to avoid duplicate questions
+      baseDelay: 1500,
+      onRetry: (attempt) => {
+        console.log(`Retrying askQuestion for session ${sessionId} (attempt ${attempt + 1})`);
       }
     }
   );

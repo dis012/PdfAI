@@ -38,10 +38,12 @@ func main() {
 
 	mux.HandleFunc("POST /api/upload", apiConfig.uploadAndPromptHandler)
 	mux.HandleFunc("POST /api/chat/{session_id}", apiConfig.createReply)
+	mux.HandleFunc("POST /api/conversation/{session_id}", apiConfig.askQuestion)
 
 	mux.HandleFunc("GET /api/sessions", apiConfig.getSessions)
 	mux.HandleFunc("GET /api/tables/{session_id}", apiConfig.getTableSession)
 	mux.HandleFunc("GET /api/chat/{session_id}", apiConfig.getChat)
+	mux.HandleFunc("GET /api/conversation/{session_id}", apiConfig.getConversation)
 
 	mux.HandleFunc("PUT /api/tables/{session_id}", apiConfig.updateTable)
 	mux.HandleFunc("PUT /api/tables/undo/{session_id}", apiConfig.undoTableVersion)

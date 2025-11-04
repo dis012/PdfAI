@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import TableDisplay from './TableDisplay';
 import EditControls from './EditControls';
 import ReplyControls from './ReplyControls';
+import ConversationPanel from './ConversationPanel';
 import InlineError from './InlineError';
 import LoadingSpinner from './LoadingSpinner';
-import { getTableData, editTable, undoTableEdit, redoTableEdit, getChat, createReply, editReply } from '../services/api';
+import { getTableData, editTable, undoTableEdit, redoTableEdit, getChat, createReply, editReply, getConversation, askQuestion } from '../services/api';
 import { showErrorToast, showSuccessToast } from './ToastContainer';
 import { logError } from '../utils/errorHandling';
 import './TabContent.css';
@@ -12,17 +13,21 @@ import './TabContent.css';
 const TabContent = ({ sessionId }) => {
   const [tableState, setTableState] = useState(null);
   const [chatData, setChatData] = useState(null);
+  const [conversationMessages, setConversationMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
+  const [conversationLoading, setConversationLoading] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [error, setError] = useState(null);
   const [editError, setEditError] = useState(null);
   const [chatError, setChatError] = useState(null);
+  const [conversationError, setConversationError] = useState(null);
 
   // Fetch table data when sessionId changes
   useEffect(() => {
     if (!sessionId) {
       setTableState(null);
+      setConversationMessages([]);
       setError(null);
       return;
     }
@@ -75,8 +80,30 @@ const TabContent = ({ sessionId }) => {
       }
     };
 
+    const fetchConversationData = async () => {
+      setConversationLoading(true);
+      setConversationError(null);
+
+      try {
+        const result = await getConversation(sessionId);
+
+        if (result.success && result.data) {
+          setConversationMessages(result.data);
+        } else {
+          // No conversation exists yet, which is normal
+          setConversationMessages([]);
+        }
+      } catch (err) {
+        // Conversation not existing is not an error
+        setConversationMessages([]);
+      } finally {
+        setConversationLoading(false);
+      }
+    };
+
     fetchTableData();
     fetchChatData();
+    fetchConversationData();
   }, [sessionId]);
 
   // Handle create reply operation
@@ -117,7 +144,7 @@ const TabContent = ({ sessionId }) => {
 
     try {
       const result = await editReply(sessionId, { prompt: prompt.trim() });
-      
+
       if (result.success && result.data) {
         setChatData(result.data);
         showSuccessToast('Reply updated successfully');
@@ -134,6 +161,35 @@ const TabContent = ({ sessionId }) => {
       showErrorToast(errorMessage);
     } finally {
       setChatLoading(false);
+    }
+  };
+
+  // Handle ask question operation
+  const handleAskQuestion = async (question) => {
+    if (!sessionId || !question.trim()) return;
+
+    setConversationLoading(true);
+    setConversationError(null);
+
+    try {
+      const result = await askQuestion(sessionId, { question: question.trim() });
+
+      if (result.success && result.data) {
+        setConversationMessages(result.data);
+        showSuccessToast('Question answered successfully');
+      } else {
+        const errorMessage = result.error || 'Failed to ask question';
+        setConversationError(errorMessage);
+        logError(new Error(errorMessage), 'TabContent.handleAskQuestion');
+        showErrorToast(errorMessage);
+      }
+    } catch (err) {
+      const errorMessage = 'An unexpected error occurred while asking question';
+      logError(err, 'TabContent.handleAskQuestion');
+      setConversationError(errorMessage);
+      showErrorToast(errorMessage);
+    } finally {
+      setConversationLoading(false);
     }
   };
 
@@ -303,15 +359,31 @@ const TabContent = ({ sessionId }) => {
       />
       
       {chatError && (
-        <InlineError 
+        <InlineError
           error={chatError}
           onRetry={() => setChatError(null)}
           retryText="Dismiss"
           className="chat-error"
         />
       )}
-      
-      <TableDisplay 
+
+      <ConversationPanel
+        messages={conversationMessages}
+        onAskQuestion={handleAskQuestion}
+        loading={conversationLoading}
+        disabled={!sessionId}
+      />
+
+      {conversationError && (
+        <InlineError
+          error={conversationError}
+          onRetry={() => setConversationError(null)}
+          retryText="Dismiss"
+          className="conversation-error"
+        />
+      )}
+
+      <TableDisplay
         data={tableState?.rows}
         loading={loading || editLoading}
       />

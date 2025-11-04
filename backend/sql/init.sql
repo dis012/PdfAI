@@ -33,3 +33,17 @@ CREATE TABLE IF NOT EXISTS chat(
     response TEXT DEFAULT NULL,
     created_at TIMESTAMP NOT NULL
 );
+
+-- Create conversation_messages table (from 005_conversation.sql)
+CREATE TABLE IF NOT EXISTS conversation_messages(
+    id UUID PRIMARY KEY,
+    session_id UUID NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    message_order INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    CONSTRAINT unique_session_message_order UNIQUE(session_id, message_order)
+);
+
+-- Create index for efficient conversation retrieval
+CREATE INDEX IF NOT EXISTS idx_conversation_session_order ON conversation_messages(session_id, message_order);

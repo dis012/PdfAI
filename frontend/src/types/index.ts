@@ -38,6 +38,21 @@ export interface ChatState {
   isLoading: boolean;
 }
 
+// Conversation Q&A Types
+export interface ConversationMessage {
+  id: string;              // UUID
+  session_id: string;      // UUID
+  role: 'user' | 'assistant';  // Message role
+  content: string;         // Message content
+  message_order: number;   // Order in conversation
+  created_at: string;      // ISO timestamp
+}
+
+export interface ConversationState {
+  messages: ConversationMessage[];
+  isLoading: boolean;
+}
+
 // API Request Types
 export interface EditRequest {
   prompt: string;
@@ -45,6 +60,10 @@ export interface EditRequest {
 
 export interface ChatRequest {
   prompt: string;
+}
+
+export interface ConversationRequest {
+  question: string;
 }
 
 // API Response Types
